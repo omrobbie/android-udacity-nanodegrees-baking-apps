@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <dimen name="default_padding">12dp</dimen>
+    <dimen name="recipe_list_img_height">150dp</dimen>
+    <dimen name="recipe_list_title">18sp</dimen>
+    <dimen name="recipe_list_servings">12sp</dimen>
+    <dimen name="recipe_list_item">16dp</dimen>
+
+    <dimen name="widget_margin">20dp</dimen>
+</resources>

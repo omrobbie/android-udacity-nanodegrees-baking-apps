@@ -1,0 +1,254 @@
+package com.omrobbie.bakingapp.database;
+
+import android.content.ContentProvider;
+import android.content.ContentProviderOperation;
+import android.content.ContentProviderResult;
+import android.content.ContentUris;
+import android.content.ContentValues;
+import android.content.OperationApplicationException;
+import android.content.UriMatcher;
+import android.database.Cursor;
+import android.database.sqlite.SQLiteDatabase;
+import android.net.Uri;
+import android.support.annotation.NonNull;
+import android.support.annotation.Nullable;
+
+import java.util.ArrayList;
+
+import static com.omrobbie.bakingapp.database.contract.IngredientContract.IngredientEntry;
+import static com.omrobbie.bakingapp.database.contract.IngredientContract.PATH_INGREDIENTS;
+import static com.omrobbie.bakingapp.database.contract.RecipeContract.PATH_RECIPES;
+import static com.omrobbie.bakingapp.database.contract.RecipeContract.RecipeEntry;
+import static com.omrobbie.bakingapp.database.contract.StepContract.PATH_STEPS;
+import static com.omrobbie.bakingapp.database.contract.StepContract.StepEntry;
+import static com.omrobbie.bakingapp.util.Constant.AUTHORITY;
+
+@SuppressWarnings("ConstantConditions")
+public class BakingContentProvider extends ContentProvider {
+
+    private static final String TAG = BakingContentProvider.class.getSimpleName();
+
+    private static final int RECIPES = 100;
+    private static final int RECIPE_WITH_ID = 101;
+    private static final int INGREDIENTS = 200;
+    private static final int INGREDIENTS_WITH_RECIPE_ID = 201;
+    private static final int STEPS = 300;
+    private static final int STEPS_WITH_RECIPE_ID = 301;
+    private static final UriMatcher uriMatcher = buildUriMatcher();
+
+    private DBHelper dbHelper;
+
+    public static UriMatcher buildUriMatcher() {
+        UriMatcher matcher = new UriMatcher(UriMatcher.NO_MATCH);
+        matcher.addURI(AUTHORITY, PATH_RECIPES, RECIPES);
+        matcher.addURI(AUTHORITY, PATH_RECIPES + "/#", RECIPE_WITH_ID);
+        matcher.addURI(AUTHORITY, PATH_INGREDIENTS, INGREDIENTS);
+        matcher.addURI(AUTHORITY, PATH_INGREDIENTS + "/#", INGREDIENTS_WITH_RECIPE_ID);
+        matcher.addURI(AUTHORITY, PATH_STEPS, STEPS);
+        matcher.addURI(AUTHORITY, PATH_STEPS + "/#", STEPS_WITH_RECIPE_ID);
+
+        return matcher;
+    }
+
+    @Override
+    public boolean onCreate() {
+        dbHelper = new DBHelper(getContext());
+        return true;
+    }
+
+    @Nullable
+    @Override
+    public Cursor query(@NonNull Uri uri, @Nullable String[] projection, @Nullable String selection, @Nullable String[] selectionArgs, @Nullable String sortOrder) {
+        Cursor result = null;
+        String whereClause;
+        String id;
+        final SQLiteDatabase db = dbHelper.getReadableDatabase();
+
+        int match = uriMatcher.match(uri);
+        switch (match) {
+            case RECIPES:
+                result = db.query(
+                        RecipeEntry.TABLE_NAME,
+                        projection,
+                        selection,
+                        selectionArgs,
+                        null,
+                        null,
+                        sortOrder
+                );
+                result.setNotificationUri(getContext().getContentResolver(), uri);
+                break;
+
+            case INGREDIENTS_WITH_RECIPE_ID:
+                whereClause = IngredientEntry.RECIPE_ID + "=?";
+                id = uri.getPathSegments().get(1);
+                result = db.query(
+                        IngredientEntry.TABLE_NAME,
+                        projection,
+                        whereClause,
+                        new String[]{id},
+                        null, null, null
+                );
+                break;
+
+            case STEPS_WITH_RECIPE_ID:
+                whereClause = StepEntry.RECIPE_ID + "=?";
+                id = uri.getPathSegments().get(1);
+                result = db.query(
+                        StepEntry.TABLE_NAME,
+                        projection,
+                        whereClause,
+                        new String[]{id},
+                        null, null, null
+                );
+                break;
+
+            default:
+                break;
+        }
+
+        return result;
+    }
+
+    @Nullable
+    @Override
+    public String getType(@NonNull Uri uri) {
+        return null;
+    }
+
+    @Nullable
+    @Override
+    public Uri insert(@NonNull Uri uri, @Nullable ContentValues values) {
+        Uri result = null;
+        long id;
+
+        final SQLiteDatabase db = dbHelper.getWritableDatabase();
+        int match = uriMatcher.match(uri);
+        switch (match) {
+            case RECIPES:
+                id = db.insert(RecipeEntry.TABLE_NAME, null, values);
+                if (id > 0) {
+                    result = ContentUris.withAppendedId(uri, id);
+                    getContext().getContentResolver().notifyChange(uri, null);
+                }
+                break;
+
+            case INGREDIENTS:
+                id = db.insert(IngredientEntry.TABLE_NAME, null, values);
+                if (id > 0) {
+                    result = ContentUris.withAppendedId(uri, id);
+                    getContext().getContentResolver().notifyChange(uri, null);
+                }
+                break;
+
+            case STEPS:
+                id = db.insert(StepEntry.TABLE_NAME, null, values);
+                if (id > 0) {
+                    result = ContentUris.withAppendedId(uri, id);
+                    getContext().getContentResolver().notifyChange(uri, null);
+                }
+                break;
+
+            default:
+                break;
+        }
+
+        return result;
+    }
+
+    @Override
+    public int delete(@NonNull Uri uri, @Nullable String selection, @Nullable String[] selectionArgs) {
+        int result = 0;
+        final SQLiteDatabase db = dbHelper.getWritableDatabase();
+
+        int match = uriMatcher.match(uri);
+        switch (match) {
+            case RECIPES:
+                result = db.delete(RecipeEntry.TABLE_NAME, null, null);
+                break;
+
+            case INGREDIENTS:
+                result = db.delete(IngredientEntry.TABLE_NAME, null, null);
+                break;
+
+            case STEPS:
+                result = db.delete(StepEntry.TABLE_NAME, null, null);
+                break;
+
+            default:
+                break;
+        }
+
+        if (result > 0) getContext().getContentResolver().notifyChange(uri, null);
+
+        return result;
+    }
+
+    @Override
+    public int update(@NonNull Uri uri, @Nullable ContentValues values, @Nullable String selection, @Nullable String[] selectionArgs) {
+        return 0;
+    }
+
+    @SuppressWarnings("ConstantConditions")
+    @Override
+    public int bulkInsert(@NonNull Uri uri, @NonNull ContentValues[] values) {
+        int numInserted = 0;
+        String table = null;
+
+        int match = uriMatcher.match(uri);
+        switch (match) {
+            case RECIPES:
+                table = RecipeEntry.TABLE_NAME;
+                break;
+
+            case INGREDIENTS:
+                table = RecipeEntry.TABLE_NAME;
+                break;
+
+            case STEPS:
+                table = RecipeEntry.TABLE_NAME;
+                break;
+
+            default:
+                break;
+        }
+
+        final SQLiteDatabase db = dbHelper.getWritableDatabase();
+        db.beginTransaction();
+        try {
+            for (ContentValues cv : values) {
+                if (table != null) {
+                    long newID = db.insert(table, null, cv);
+                }
+            }
+            db.setTransactionSuccessful();
+            getContext().getContentResolver().notifyChange(uri, null);
+            numInserted = values.length;
+        } finally {
+            db.endTransaction();
+        }
+
+        return numInserted;
+    }
+
+    @NonNull
+    @Override
+    public ContentProviderResult[] applyBatch(@NonNull ArrayList<ContentProviderOperation> operations) throws OperationApplicationException {
+        ContentProviderResult[] result = new ContentProviderResult[operations.size()];
+
+        final SQLiteDatabase db = dbHelper.getWritableDatabase();
+        db.beginTransaction();
+        try {
+            final int numOperations = operations.size();
+            final ContentProviderResult[] results = new ContentProviderResult[numOperations];
+            for (int i = 0; i < numOperations; i++) {
+                results[i] = operations.get(i).apply(this, results, i);
+            }
+            db.setTransactionSuccessful();
+        } finally {
+            db.endTransaction();
+        }
+
+        return result;
+    }
+}
